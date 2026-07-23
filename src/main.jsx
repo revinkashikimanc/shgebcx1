@@ -60,6 +60,44 @@ const buyerReviews = [
   { name: "Moki I.", date: "7 Jul 2026, 10.54", text: "manteb min" },
 ];
 
+function joinApiUrl(base, path) {
+  const cleanBase = String(base || "").trim();
+  const cleanPath = String(path || "").trim();
+  if (!cleanBase) return cleanPath;
+  if (!cleanPath) return cleanBase;
+
+  if (cleanBase.includes("?path=")) {
+    return `${cleanBase}${cleanPath.startsWith("/") ? cleanPath : `/${cleanPath}`}`;
+  }
+
+  return `${cleanBase.replace(/\/+$/, "")}/${cleanPath.replace(/^\/+/, "")}`;
+}
+
+function resolveApiMediaUrl(value, fallbackPath = "") {
+  const raw = String(value || "").trim();
+  const proxyBase = String(API_BASE_URL || "").trim();
+  const toApiUrl = (path) => joinApiUrl(proxyBase, path);
+
+  if (raw.startsWith("data:") || raw.startsWith("blob:")) return raw;
+
+  if (raw) {
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost";
+      const parsed = new URL(raw, origin);
+      const pathWithQuery = `${parsed.pathname}${parsed.search}`;
+      if (parsed.pathname.startsWith("/api/web/")) return toApiUrl(pathWithQuery);
+      if (parsed.pathname.startsWith("/api/proxy")) return pathWithQuery;
+      if (/^https?:\/\//i.test(raw)) return raw;
+    } catch {}
+
+    if (raw.startsWith("/api/web/")) return toApiUrl(raw);
+    if (raw.startsWith("/api/proxy")) return raw;
+    return raw;
+  }
+
+  return fallbackPath ? toApiUrl(fallbackPath) : "";
+}
+
 function BrandText({ brand = DEFAULT_STORE_BRAND, className = "", dot = false }) {
   const normalized = String(brand || DEFAULT_STORE_BRAND).trim().toUpperCase();
   const suffixMatch = normalized.match(/^(.+?)(STORE|SHOP|XIT)$/i);
@@ -2175,7 +2213,10 @@ function PaymentPanel({ order, language = "id", storeInfo = {}, onBack, onNaviga
   const [statusNotice, setStatusNotice] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const refreshLockRef = useRef(false);
-  const qrisUrl = order.qris_image_url || (API_BASE_URL && order.reference_id ? `${API_BASE_URL}/api/web/orders/${order.reference_id}/qris.png` : "");
+  const qrisUrl = resolveApiMediaUrl(
+    order.qris_image_url || order.payment?.qris_image_url || order.payment?.qr_url,
+    order.reference_id ? `/api/web/orders/${order.reference_id}/qris.png` : ""
+  );
   const subtotalAmount = getOrderSubtotal(order);
   const payableAmount = getOrderPayableAmount(order);
   const uniqueCode = getOrderUniqueCode(order);
