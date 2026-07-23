@@ -75,7 +75,7 @@ export default async function handler(req, res) {
       method: req.method,
       headers: getProxyHeaders(req),
       body: await getRequestBody(req),
-      redirect: "manual",
+      redirect: "follow",
     });
 
     for (const name of ["content-type", "cache-control", "content-disposition"]) {
